@@ -1,6 +1,31 @@
+import { useEffect, useState } from 'react'
 import { Mail, Phone, MapPin, ArrowRight } from 'lucide-react'
+import * as QRCode from 'qrcode'
 
 export default function Footer() {
+  const [qrSvg, setQrSvg] = useState<string>('')
+
+  useEffect(() => {
+    const canonical =
+      document.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.href?.trim() || window.location.origin
+    const url = canonical.endsWith('/') ? canonical : `${canonical}/`
+    let cancelled = false
+
+    QRCode.toString(url, { type: 'svg', errorCorrectionLevel: 'H', width: 240, margin: 2 })
+      .then((svg: string) => {
+        if (cancelled) return
+        setQrSvg(svg)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setQrSvg('')
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   return (
     <footer className="bg-[#001a4d]">
       {/* BAND SUPERIORE CTA */}
@@ -109,16 +134,12 @@ export default function Footer() {
               Inquadra & Contattaci
             </h4>
             <div className="bg-white p-3 rounded-xl inline-block mb-4">
-              <div className="w-24 h-24 bg-[#003082] rounded grid grid-cols-3 grid-rows-3 gap-1 p-2">
-                <div className="bg-white rounded-sm col-span-1"></div>
-                <div className="bg-[#003082] rounded-sm"></div>
-                <div className="bg-white rounded-sm"></div>
-                <div className="bg-[#003082] rounded-sm"></div>
-                <div className="bg-white rounded-sm"></div>
-                <div className="bg-[#003082] rounded-sm"></div>
-                <div className="bg-white rounded-sm"></div>
-                <div className="bg-[#003082] rounded-sm"></div>
-                <div className="bg-white rounded-sm col-span-1"></div>
+              <div className="w-24 h-24 flex items-center justify-center overflow-hidden">
+                {qrSvg ? (
+                  <div className="w-full h-full [&_svg]:w-full [&_svg]:h-full" dangerouslySetInnerHTML={{ __html: qrSvg }} />
+                ) : (
+                  <div className="text-xs text-gray-400">Caricamento…</div>
+                )}
               </div>
             </div>
             <p className="text-white/40 text-xs mb-6">

@@ -1,10 +1,12 @@
 import { useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion, type Variants } from 'framer-motion'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { Minus, Plus, Search, ShoppingCart, Star, X } from 'lucide-react'
 import { categorie, ordinamenti, prodotti } from '../data/prodotti'
 
 type CartItem = { id: number; nome: string; prezzo: number; qty: number; img: string }
+
+type Categoria = (typeof categorie)[number]
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -36,9 +38,19 @@ function buildMailto(cart: CartItem[]) {
   return `mailto:info@gruppodm.it?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
 }
 
+function isCategoria(value: string | null): value is Categoria {
+  if (value === null) return false
+  return categorie.includes(value as Categoria)
+}
+
 export default function Prodotti() {
-  const [search, setSearch] = useState('')
-  const [categoria, setCategoria] = useState<string>('Tutti')
+  const location = useLocation()
+  const initialParams = useMemo(() => new URLSearchParams(location.search), [location.search])
+  const initialCategoriaParam = initialParams.get('categoria')
+  const initialCategoria = isCategoria(initialCategoriaParam) ? initialCategoriaParam : 'Tutti'
+
+  const [search, setSearch] = useState(() => initialParams.get('q') ?? '')
+  const [categoria, setCategoria] = useState<string>(initialCategoria)
   const [ordinamento, setOrdinamento] = useState<string>('Rilevanza')
   const [soloDisponibili, setSoloDisponibili] = useState(false)
   const [cart, setCart] = useState<CartItem[]>([])

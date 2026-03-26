@@ -45,7 +45,7 @@ export default function Hero() {
 
   return (
     <section className="relative w-full overflow-hidden bg-[#001a4d]" style={{ height: '100vh', minHeight: '600px' }}>
-      <div className="absolute inset-0">
+      <div className="absolute inset-0 overflow-hidden z-0">
         {images.map((src, i) => (
           <img
             key={i}
@@ -55,7 +55,7 @@ export default function Hero() {
             style={{ opacity: activeImg === i ? 1 : 0 }}
           />
         ))}
-        <div className="absolute inset-0 bg-[#001a4d]/70" />
+        <div className="absolute inset-0 bg-[#001a4d]/70 z-0" />
       </div>
 
       <div className="relative z-10 h-full flex flex-col">
@@ -167,12 +167,12 @@ export default function Hero() {
             </div>
           </div>
 
-          <div className="hidden lg:flex flex-col w-80 border-l border-white/10 bg-white/5 backdrop-blur-sm">
+          <div className="hidden lg:flex flex-col w-80 border-l border-white/10 bg-white/5 backdrop-blur-sm relative z-20">
             <div className="flex border-b border-white/10">
               <button
                 type="button"
                 onClick={() => setActiveTab('configuratore')}
-                className={`flex-1 flex items-center justify-center gap-2 py-4 text-xs font-bold uppercase tracking-wider transition ${
+                className={`flex-1 flex items-center justify-center gap-2 py-4 text-xs font-bold uppercase tracking-wider transition relative z-20 cursor-pointer pointer-events-auto ${
                   activeTab === 'configuratore'
                     ? 'text-[#F5C400] border-b-2 border-[#F5C400]'
                     : 'text-white/40 hover:text-white/70'
@@ -183,7 +183,7 @@ export default function Hero() {
               <button
                 type="button"
                 onClick={() => setActiveTab('shop')}
-                className={`flex-1 flex items-center justify-center gap-2 py-4 text-xs font-bold uppercase tracking-wider transition ${
+                className={`flex-1 flex items-center justify-center gap-2 py-4 text-xs font-bold uppercase tracking-wider transition relative z-20 cursor-pointer pointer-events-auto ${
                   activeTab === 'shop' ? 'text-[#F5C400] border-b-2 border-[#F5C400]' : 'text-white/40 hover:text-white/70'
                 }`}
               >

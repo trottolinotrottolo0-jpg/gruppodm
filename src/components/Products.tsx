@@ -1,4 +1,5 @@
 import { motion, type Variants } from 'framer-motion'
+import { Link } from 'react-router-dom'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -50,6 +51,8 @@ const products = [
   },
 ] as const
 
+const MotionLink = motion.create(Link)
+
 export default function Products() {
   return (
     <section id="prodotti" className="bg-white py-16">
@@ -72,9 +75,9 @@ export default function Products() {
           viewport={{ once: false, amount: 0.2 }}
         >
           {products.map((p) => (
-            <motion.a
+            <MotionLink
               key={p.title}
-              href="#"
+              to={`/prodotti?categoria=${encodeURIComponent(p.title)}`}
               variants={cardVariants}
               className="relative rounded-xl overflow-hidden h-48 cursor-pointer group"
             >
@@ -92,7 +95,7 @@ export default function Products() {
                 <div className="text-base font-bold text-white">{p.title}</div>
                 <div className="mt-2 text-sm text-white/70">{p.tagline}</div>
               </div>
-            </motion.a>
+            </MotionLink>
           ))}
         </motion.div>
       </div>

@@ -12,7 +12,7 @@ export default function Home() {
     <>
       <Hero />
       <VideoScrub />
-      <SocialVideoWidget count={8} layout="grid" autoplay={false} />
+      <SocialVideoWidget count={4} />
       <Products />
       <VideoSection />
       <Gallery />
