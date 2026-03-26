@@ -5,12 +5,14 @@ import VideoSection from '../components/VideoSection'
 import Gallery from '../components/Gallery'
 import LeadForm from '../components/LeadForm'
 import PreventivoDedicato from '../components/PreventivoDedicato'
+import SocialVideoWidget from '../components/SocialVideoWidget'
 
 export default function Home() {
   return (
     <>
       <Hero />
       <VideoScrub />
+      <SocialVideoWidget count={8} layout="grid" autoplay={false} />
       <Products />
       <VideoSection />
       <Gallery />

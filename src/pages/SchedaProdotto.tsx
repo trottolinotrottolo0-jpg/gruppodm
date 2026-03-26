@@ -1,16 +1,92 @@
-import { useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useLocation, useParams, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Star, ShoppingCart, Shield, Truck, RotateCcw, ChevronRight, Minus, Plus } from 'lucide-react'
 import { prodotti } from '../data/prodotti'
+import * as QRCode from 'qrcode'
 
 export default function SchedaProdotto() {
   const { slug } = useParams()
+  const location = useLocation()
   const prodotto = prodotti.find((p) => p.slug === slug)
   const [qty, setQty] = useState<number>(prodotto?.quantitaMinima || 1)
   const [activeTab, setActiveTab] = useState('Specifiche')
   const [thumb, setThumb] = useState(0)
   const [submitted, setSubmitted] = useState(false)
+  const [qrSvg, setQrSvg] = useState<string>('')
+  const [qrError, setQrError] = useState(false)
+
+  const correlati = prodotti.filter((p) => p.slug !== slug).slice(0, 4)
+  const tabs = ['Specifiche', 'Descrizione', 'Spedizione']
+  const sku = prodotto ? prodotto.id.toString().padStart(4, '0') : ''
+  const shortUrl = sku
+    ? (() => {
+        const u = new URL(`${window.location.origin}/p/${encodeURIComponent(sku)}`)
+        u.searchParams.set('utm_source', 'qr_code')
+        u.searchParams.set('utm_medium', 'product_scan')
+        u.searchParams.set('utm_campaign', sku)
+        return u.toString()
+      })()
+    : ''
+  const qrUrl =
+    sku && prodotto
+      ? (() => {
+          const u = new URL(`${window.location.origin}/prodotto/${encodeURIComponent(sku)}/${encodeURIComponent(prodotto.slug)}`)
+          u.searchParams.set('utm_source', 'qr_code')
+          u.searchParams.set('utm_medium', 'product_scan')
+          u.searchParams.set('utm_campaign', sku)
+          return u.toString()
+        })()
+      : ''
+
+  useEffect(() => {
+    if (!qrUrl) return
+    let cancelled = false
+    QRCode.toString(qrUrl, {
+      type: 'svg',
+      errorCorrectionLevel: 'H',
+      width: 320,
+      margin: 4,
+      color: { dark: '#000000', light: '#00000000' },
+    })
+      .then((svg: string) => {
+        if (cancelled) return
+        setQrError(false)
+        setQrSvg(svg)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setQrError(true)
+        setQrSvg('')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [qrUrl])
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const source = params.get('utm_source')
+    if (source !== 'qr_code') return
+    if (!sku) return
+    try {
+      const payload = JSON.stringify({ sku, path: location.pathname + location.search })
+      navigator.sendBeacon?.('/api/qr/scan', payload)
+    } catch {
+      void 0
+    }
+  }, [location.pathname, location.search, sku])
+
+  const downloadQrSvg = () => {
+    if (!qrSvg) return
+    const blob = new Blob([qrSvg], { type: 'image/svg+xml;charset=utf-8' })
+    const blobUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = blobUrl
+    a.download = `qr-${sku}.svg`
+    a.click()
+    URL.revokeObjectURL(blobUrl)
+  }
 
   if (!prodotto)
     return (
@@ -21,9 +97,6 @@ export default function SchedaProdotto() {
         </Link>
       </div>
     )
-
-  const correlati = prodotti.filter((p) => p.slug !== slug).slice(0, 4)
-  const tabs = ['Specifiche', 'Descrizione', 'Spedizione']
 
   return (
     <div className="min-h-screen bg-white">
@@ -151,6 +224,44 @@ export default function SchedaProdotto() {
             <button className="w-full mt-2 py-3 border-2 border-[#003082] text-[#003082] font-bold rounded-xl hover:bg-[#003082] hover:text-white transition">
               Richiedi preventivo personalizzato
             </button>
+
+            <div className="mt-5 border border-gray-100 rounded-xl p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-bold text-[#1A1A2E]">QR Code prodotto</p>
+                  <p className="text-xs text-gray-500 mt-1">Scansione tracciata con UTM (qr_code)</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={downloadQrSvg}
+                  disabled={!qrSvg}
+                  className="text-xs font-bold text-[#003082] hover:underline disabled:text-gray-300 disabled:no-underline"
+                >
+                  Scarica SVG
+                </button>
+              </div>
+              <div className="mt-4 flex items-center gap-4">
+                <div className="w-[160px] h-[160px] bg-white border border-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
+                  {qrError ? (
+                    <span className="text-xs text-gray-400 text-center px-3">QR non disponibile</span>
+                  ) : qrSvg ? (
+                    <div
+                      className="w-full h-full [&_svg]:w-full [&_svg]:h-full"
+                      aria-label={`QR per ${prodotto.nome}`}
+                      dangerouslySetInnerHTML={{ __html: qrSvg }}
+                    />
+                  ) : (
+                    <span className="text-xs text-gray-400">Caricamento…</span>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs font-semibold text-gray-600">URL:</p>
+                  <p className="text-xs text-gray-500 break-all mt-1">{qrUrl}</p>
+                  <p className="text-xs font-semibold text-gray-600 mt-3">Short URL:</p>
+                  <p className="text-xs text-gray-500 break-all mt-1">{shortUrl}</p>
+                </div>
+              </div>
+            </div>
 
             <div className="mt-6 flex flex-col gap-3">
               {[

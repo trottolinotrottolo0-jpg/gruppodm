@@ -38,6 +38,8 @@ export default function VideoScrub() {
   const durationRef = useRef(0)
   const rafIdRef = useRef<number | null>(null)
   const latestPctRef = useRef(0)
+  const inViewRef = useRef(false)
+  const rvfcPendingRef = useRef(false)
   const [progress, setProgress] = useState(0)
   const [activeIndex, setActiveIndex] = useState(-1)
 
@@ -45,53 +47,92 @@ export default function VideoScrub() {
     const video = videoRef.current
     if (!video) return
 
-    // Preload video metadata
-    video.preload = 'auto'
+    type NetworkInformation = { saveData?: boolean; effectiveType?: string } | undefined
+    const conn = (navigator as Navigator & { connection?: NetworkInformation }).connection
+    const saveData = !!conn && !!conn.saveData
+    const slow = !!conn && conn.effectiveType === '2g'
+    video.preload = saveData || slow ? 'metadata' : 'auto'
     video.pause()
 
-    const handleScroll = () => {
+    const computePct = () => {
       const section = sectionRef.current
-      if (!section) return
-
+      if (!section) return 0
       const rect = section.getBoundingClientRect()
-      const sectionHeight = section.offsetHeight - window.innerHeight
+      const sectionHeight = Math.max(section.offsetHeight - window.innerHeight, 1)
       const scrolled = -rect.top
       const pct = Math.min(Math.max(scrolled / sectionHeight, 0), 1)
+      return pct
+    }
 
-      latestPctRef.current = pct
-
+    const schedule = () => {
       if (rafIdRef.current !== null) return
       rafIdRef.current = window.requestAnimationFrame(() => {
         rafIdRef.current = null
-        const pctNow = latestPctRef.current
+        if (!inViewRef.current) return
+        const pctNow = computePct()
+        latestPctRef.current = pctNow
         const duration = durationRef.current || video.duration
-
         if (duration) {
-          const targetTime = pctNow * duration
-          const fastSeek = (video as HTMLVideoElement & { fastSeek?: (time: number) => void }).fastSeek
-          if (typeof fastSeek === 'function') fastSeek.call(video, targetTime)
-          else video.currentTime = targetTime
+          const targetTime = Math.max(0, Math.min(duration, pctNow * duration))
+          const needsSeek = Math.abs((video.currentTime || 0) - targetTime) > 1 / 60
+          if (needsSeek) {
+            const fastSeek = (video as HTMLVideoElement & { fastSeek?: (time: number) => void }).fastSeek
+            if (typeof fastSeek === 'function') fastSeek.call(video, targetTime)
+            else video.currentTime = targetTime
+          }
         }
-
-        setProgress((prev) => (Math.abs(prev - pctNow) < 0.001 ? prev : pctNow))
-
-        const idx = points.findIndex((p) => pctNow >= p.from && pctNow <= p.to)
-        setActiveIndex((prev) => (prev === idx ? prev : idx))
+        const applyUI = () => {
+          setProgress((prev) => (Math.abs(prev - latestPctRef.current) < 0.001 ? prev : latestPctRef.current))
+          const idx = points.findIndex((p) => latestPctRef.current >= p.from && latestPctRef.current <= p.to)
+          setActiveIndex((prev) => (prev === idx ? prev : idx))
+          rvfcPendingRef.current = false
+        }
+        type RequestVideoFrameCallback = (callback: (now: number, metadata: { presentedFrames: number }) => void) => number
+        type VideoWithRVFC = HTMLVideoElement & { requestVideoFrameCallback?: RequestVideoFrameCallback }
+        const v = video as VideoWithRVFC
+        if (typeof v.requestVideoFrameCallback === 'function') {
+          if (!rvfcPendingRef.current) {
+            rvfcPendingRef.current = true
+            v.requestVideoFrameCallback(() => applyUI())
+          }
+        } else {
+          applyUI()
+        }
       })
+    }
+
+    const handleScroll = () => {
+      if (!inViewRef.current) return
+      schedule()
     }
 
     const onLoadedMetadata = () => {
       durationRef.current = video.duration
-      handleScroll()
+      schedule()
     }
 
     video.addEventListener('loadedmetadata', onLoadedMetadata)
     if (video.readyState >= 1) onLoadedMetadata()
 
-    window.addEventListener('scroll', handleScroll, { passive: true })
+    const io = new IntersectionObserver(
+      (entries) => {
+        const e = entries[0]
+        inViewRef.current = !!e?.isIntersecting
+        if (inViewRef.current) {
+          schedule()
+          window.addEventListener('scroll', handleScroll, { passive: true })
+        } else {
+          window.removeEventListener('scroll', handleScroll)
+        }
+      },
+      { root: null, threshold: 0, rootMargin: '40% 0px 40% 0px' }
+    )
+    if (sectionRef.current) io.observe(sectionRef.current)
+
     return () => {
       video.removeEventListener('loadedmetadata', onLoadedMetadata)
       window.removeEventListener('scroll', handleScroll)
+      io.disconnect()
       if (rafIdRef.current !== null) window.cancelAnimationFrame(rafIdRef.current)
     }
   }, [])
@@ -109,6 +150,7 @@ export default function VideoScrub() {
           muted
           playsInline
           preload="auto"
+          crossOrigin="anonymous"
           className="absolute inset-0 w-full h-full object-cover opacity-90"
         />
 
